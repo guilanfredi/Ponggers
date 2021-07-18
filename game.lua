@@ -23,7 +23,53 @@ local player1
 local player2
 local goalPlayer1
 local goalPlayer2
+local upperSideline
+local lowerSideline
+local scoreText1
+local scoreText2
 
+local goalOffset = 5
+local sidelineOffset = 15
+local initialSpeed = 100
+local score = {player1=0, player2=0}
+
+local function getInitialSpeed()
+	-- Equation -> x² + y² = r²
+	local x = math.random(10, 90)
+	local y = math.sqrt(math.pow(initialSpeed,2) - math.pow(x,2))
+
+	-- Multiply values with -1 or 1 ramdomly to change direction
+	local values = { -1, 1 }
+	local sinalx = values[math.random(#values)]
+	local sinaly = values[math.random(#values)]
+
+	return { x = x * sinalx, y = y * sinaly }
+end
+
+local function updateScores()
+	scoreText1.text = score.player1
+	scoreText2.text = score.player2
+end
+
+local function onGlobalCollision( event )
+	local obj1 = event.object1
+	local obj2 = event.object2
+    
+	if ( event.phase == "began" ) then
+        if ((obj1.myName == "goalPlayer1" and obj2.myName == "ball") or (obj1.myName == "ball" and obj2.myName == "goalPlayer1")) then
+			score.player2 = score.player2 + 1
+			updateScores()
+			--startMatch()
+		elseif ((obj1.myName == "goalPlayer2" and obj2.myName == "ball") or (obj1.myName == "ball" and obj2.myName == "goalPlayer2")) then
+			score.player1 = score.player1 + 1
+			updateScores()
+			--startMatch()
+		end
+
+    elseif ( event.phase == "ended" ) then
+        print( "ended: " .. event.object1.myName .. " and " .. event.object2.myName )
+    end
+end
 -- -----------------------------------------------------------------------------------
 -- Scene event functions
 -- -----------------------------------------------------------------------------------
@@ -45,31 +91,54 @@ function scene:create( event )
 	uiGroup = display.newGroup() -- Display group for UI objects like the score
 	sceneGroup:insert(uiGroup)
 
+	-- Main
+
     ball = display.newImageRect(mainGroup, myImageSheet, sheetInfo:getFrameIndex("Ball"), 20, 20)
 	ball.x = display.contentCenterX
 	ball.y = display.contentCenterY
-	physics.addBody(ball, "dynamic", { radius=10, bounce=1.5});
-	ball:setLinearVelocity( math.random(-100, 100), 0)
-
+	ball.myName = "ball"
+	physics.addBody(ball, "dynamic", { radius=5, bounce=1.0});
+	
 	player1 = display.newImageRect(mainGroup, myImageSheet, sheetInfo:getFrameIndex("Player1"), 16, 40)
 	player1.x = 20
 	player1.y = display.contentCenterY
+	player1.myName = "player1"
 	local player1_outline = graphics.newOutline( 1, myImageSheet, sheetInfo:getFrameIndex("Player1") )
 	physics.addBody(player1, "static", { outline=player1_outline });
 
 	player2 = display.newImageRect(mainGroup, myImageSheet, sheetInfo:getFrameIndex("Player2"), 16, 40)
 	player2.x = display.contentWidth - 20
 	player2.y = display.contentCenterY
+	player2.myName = "player2"
 	local player2_outline = graphics.newOutline( 1, myImageSheet, sheetInfo:getFrameIndex("Player1") )
 	physics.addBody(player2, "static", { outline=player2_outline });
 
+	goalPlayer1 = display.newRect(mainGroup, goalOffset, display.contentCenterY, 5, display.contentHeight)
+	goalPlayer1.isVisible = true
+	goalPlayer1.myName = "goalPlayer1"
+	physics.addBody(goalPlayer1,"static", { isSensor=true })
 
-	goalPlayer1 = display.newLine(mainGroup, 5,0 , 5,display.contentHeight)
-	goalPlayer1.isVisible = false
-	goalPlayer2 = display.newLine(mainGroup, display.contentWidth-5,0 , display.contentWidth-5,display.contentHeight)
-	goalPlayer2.isVisible = false
+	goalPlayer2 = display.newRect(mainGroup, display.contentWidth-goalOffset, display.contentCenterY, 5, display.contentHeight)
+	goalPlayer2.isVisible = true
+	goalPlayer2.myName = "goalPlayer2"
+	physics.addBody(goalPlayer2,"static", { isSensor=true })
 
-    display.newText(uiGroup, "LEL THE GAME", display.contentCenterX, 40, native.systemFont, 36)
+	upperSideline = display.newRect(mainGroup, display.contentCenterX, sidelineOffset, display.contentWidth, 5)
+	upperSideline.isVisible = true
+	upperSideline.myName = "upperSideline"
+	physics.addBody(upperSideline, "static")
+
+	lowerSideline = display.newRect(mainGroup, display.contentCenterX, display.contentHeight - sidelineOffset, display.contentWidth, 5)
+	lowerSideline.isVisible = true
+	lowerSideline.myName = "lowerSideline"
+	physics.addBody(lowerSideline, "static")
+
+	-- UI
+
+    display.newText(uiGroup, "LEL", display.contentCenterX, 40, native.systemFont, 36)
+
+	scoreText1 = display.newText(uiGroup, score.player1, (display.contentCenterX/2), 40, native.systemFont, 36);
+	scoreText2 = display.newText(uiGroup, score.player2, (display.contentWidth/4)*3, 40, native.systemFont, 36);
 end
 
 
@@ -84,8 +153,13 @@ function scene:show( event )
 
 	elseif ( phase == "did" ) then
 		-- Code here runs when the scene is entirely on screen
+		local speed = getInitialSpeed()
+		ball:setLinearVelocity( speed.x, speed.y)
+		
 		physics.start()
-
+		
+		Runtime:addEventListener( "collision", onGlobalCollision )
+		
 
 	end
 end
